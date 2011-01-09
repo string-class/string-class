@@ -68,6 +68,27 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvStri
     altHead :: s -> StringCellAltChar s
     altLast :: s -> StringCellAltChar s
 
+    -- | Construction of a string; implementations should behave safely with invalid lengths
+    --
+    -- The default implementation of 'undfoldr' is independent from that of 'altUnfoldr',
+    -- as well as 'unfoldrN' as and 'altUnfoldrN'.
+    unfoldr     ::        (a -> Maybe (StringCellChar    s, a)) -> a -> s
+    altUnfoldr  ::        (a -> Maybe (StringCellAltChar s, a)) -> a -> s
+    unfoldrN    :: Int -> (a -> Maybe (StringCellChar    s, a)) -> a -> s
+    altUnfoldrN :: Int -> (a -> Maybe (StringCellAltChar s, a)) -> a -> s
+
+    unfoldr f b =
+        case f b of
+            (Just (a, new_b)) -> a `cons` unfoldr f new_b
+            (Nothing)         -> empty
+
+    altUnfoldr f b =
+        case f b of
+            (Just (a, new_b)) -> a `altCons` altUnfoldr f new_b
+            (Nothing)         -> empty
+    unfoldrN    = const unfoldr
+    altUnfoldrN = const altUnfoldr
+
     -- | Get the character at the given position
     --
     -- The default definitions are independent of each other,
@@ -311,6 +332,7 @@ instance StringCells String where
     tail          = List.tail
     init          = List.init
     last          = List.last
+    unfoldr       = List.unfoldr
     index         = (List.!!)
     index64 s     = index s . fromIntegral
     genericIndex  = List.genericIndex
@@ -341,6 +363,10 @@ instance StringCells S.ByteString where
     tail            = S.tail
     init            = S.init
     last            = S.last
+    unfoldr         = S.unfoldr
+    altUnfoldr      = SC.unfoldr
+    unfoldrN        = ((fst .) .) . S.unfoldrN
+    altUnfoldrN     = ((fst .) .) . SC.unfoldrN
     index           = S.index
     index64 s       = index s . fromIntegral
     take            = S.take
@@ -369,6 +395,8 @@ instance StringCells L.ByteString where
     tail            = L.tail
     init            = L.init
     last            = L.last
+    unfoldr         = L.unfoldr
+    altUnfoldr      = LC.unfoldr
     index s         = index64 s . fromIntegral
     index64         = L.index
     take64          = L.take
@@ -397,6 +425,10 @@ instance StringCells T.Text where
     tail            = T.tail
     init            = T.init
     last            = T.last
+    unfoldr         = T.unfoldr
+    altUnfoldr      = T.unfoldr
+    unfoldrN        = T.unfoldrN
+    altUnfoldrN     = T.unfoldrN
     index           = T.index
     index64 s       = index s . fromIntegral
     append          = T.append
