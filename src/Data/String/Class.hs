@@ -1,17 +1,21 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts, TypeSynonymInstances #-}
+{-# LANGUAGE TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable #-}
 
 -- | This module is mostly self-explanatory
 
 module Data.String.Class
     ( StringCells(..)
     , StringCell(..)
+    , ConvGenString(..)
     , ConvString(..)
     , ConvStrictByteString(..)
     , ConvLazyByteString(..)
     , ConvText(..)
+    , GenString(..)
+    , GenStringDefault
     ) where
 
-import Prelude hiding (head, tail, last, init, take, drop, length, null)
+import Prelude hiding (head, tail, last, init, take, drop, length, null, concat)
+import Control.Applicative hiding (empty)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as SC
 import qualified Data.ByteString.Internal as BI
@@ -28,7 +32,7 @@ import Data.Word
 type Unused a = a
 
 -- | Minimal complete definition: StringCellChar; StringCellAltChar; toStringCells; fromStringCells; toMainChar; toAltChar; cons; snoc; either all of head, tail, last, and init, or all of uncons and unsnoc; take, take64 or genericTake; drop, drop64, or genericDrop; length, length64, or genericLength; empty; null; and concat
-class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s, Eq s, Typeable s) => StringCells s where
+class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s, Eq s, Typeable s) => StringCells s where
     type StringCellChar s
     type StringCellAltChar s
 
@@ -289,13 +293,23 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvStri
         return (a, b, c, d, s'''')
 
 class StringCell c where
-    toChar    :: c -> Char
-    toWord8   :: c -> Word8
-    fromChar  :: Char -> c
-    fromWord8 :: Word8 -> c
+    toChar     :: c      -> Char
+    toWord8    :: c      -> Word8
+    toWord16   :: c      -> Word16
+    toWord32   :: c      -> Word32
+    toWord64   :: c      -> Word64
+    fromChar   :: Char   -> c
+    fromWord8  :: Word8  -> c
+    fromWord16 :: Word16 -> c
+    fromWord32 :: Word32 -> c
+    fromWord64 :: Word64 -> c
+
+class ConvGenString s where
+    toGenString   :: s -> GenString
+    fromGenString :: GenString -> s
 
 class ConvString s where
-    toString :: s -> String
+    toString   :: s -> String
     fromString :: String -> s
 
 class ConvStrictByteString s where
@@ -309,6 +323,8 @@ class ConvLazyByteString s where
 class ConvText s where
     toText :: s -> T.Text
     fromText :: T.Text -> s
+
+
 
 instance StringCells String where
     type StringCellChar    String = Char
@@ -435,16 +451,92 @@ instance StringCells T.Text where
     concat          = T.concat
 
 instance StringCell Char where
-    toChar    = id
-    toWord8   = BI.c2w
-    fromChar  = id
-    fromWord8 = BI.w2c
+    toChar     = id
+    toWord8    = BI.c2w
+    toWord16   = fromIntegral . toWord8
+    toWord32   = fromIntegral . toWord8
+    toWord64   = fromIntegral . toWord8
+    fromChar   = id
+    fromWord8  = BI.w2c
+    fromWord16 = BI.w2c . fromIntegral
+    fromWord32 = BI.w2c . fromIntegral
+    fromWord64 = BI.w2c . fromIntegral
 
 instance StringCell Word8 where
-    toChar    = BI.w2c
-    toWord8   = id
-    fromChar  = BI.c2w
-    fromWord8 = id
+    toChar     = BI.w2c
+    toWord8    = id
+    toWord16   = fromIntegral
+    toWord32   = fromIntegral
+    toWord64   = fromIntegral
+    fromChar   = BI.c2w
+    fromWord8  = id
+    fromWord16 = fromIntegral
+    fromWord32 = fromIntegral
+    fromWord64 = fromIntegral
+
+instance StringCell Word16 where
+    toChar     = BI.w2c . fromIntegral
+    toWord8    = fromIntegral
+    toWord16   = id
+    toWord32   = fromIntegral
+    toWord64   = fromIntegral
+    fromChar   = fromIntegral . BI.c2w
+    fromWord8  = fromIntegral
+    fromWord16 = id
+    fromWord32 = fromIntegral
+    fromWord64 = fromIntegral
+
+instance StringCell Word32 where
+    toChar     = BI.w2c . fromIntegral
+    toWord8    = fromIntegral
+    toWord16   = fromIntegral
+    toWord32   = id
+    toWord64   = fromIntegral
+    fromChar   = fromIntegral . BI.c2w
+    fromWord8  = fromIntegral
+    fromWord16 = fromIntegral
+    fromWord32 = id
+    fromWord64 = fromIntegral
+
+instance StringCell Word64 where
+    toChar     = BI.w2c . fromIntegral
+    toWord8    = fromIntegral
+    toWord16   = fromIntegral
+    toWord32   = fromIntegral
+    toWord64   = id
+    fromChar   = fromIntegral . BI.c2w
+    fromWord8  = fromIntegral
+    fromWord16 = fromIntegral
+    fromWord32 = fromIntegral
+    fromWord64 = id
+
+instance ConvGenString GenString where
+    toGenString   = id
+    fromGenString = id
+
+instance ConvGenString String where
+    toGenString      = GenString
+    fromGenString _s = case _s of
+        (GenString _s) -> toStringCells _s
+
+instance ConvGenString SC.ByteString where
+    toGenString      = GenString
+    fromGenString _s = case _s of
+        (GenString _s) -> toStringCells _s
+
+instance ConvGenString LC.ByteString where
+    toGenString      = GenString
+    fromGenString _s = case _s of
+        (GenString _s) -> toStringCells _s
+
+instance ConvGenString T.Text where
+    toGenString      = GenString
+    fromGenString _s = case _s of
+        (GenString _s) -> toStringCells _s
+
+instance ConvString GenString where
+    toString   = fromGenString
+    fromString = toGenString
 
 instance ConvString String where
     toString   = id
@@ -462,6 +554,10 @@ instance ConvString T.Text where
     toString   = T.unpack
     fromString = T.pack
 
+instance ConvStrictByteString GenString where
+    toStrictByteString   = fromGenString
+    fromStrictByteString = toGenString
+
 instance ConvStrictByteString String where
     toStrictByteString   = SC.pack
     fromStrictByteString = SC.unpack
@@ -477,6 +573,10 @@ instance ConvStrictByteString L.ByteString where
 instance ConvStrictByteString T.Text where
     toStrictByteString   = TE.encodeUtf8
     fromStrictByteString = toText
+
+instance ConvLazyByteString GenString where
+    toLazyByteString   = fromGenString
+    fromLazyByteString = toGenString
 
 instance ConvLazyByteString String where
     toLazyByteString   = LC.pack
@@ -494,6 +594,10 @@ instance ConvLazyByteString T.Text where
     toLazyByteString   = toLazyByteString . toStrictByteString
     fromLazyByteString = toText
 
+instance ConvText GenString where
+    toText   = fromGenString
+    fromText = toGenString
+
 instance ConvText String where
     toText   = T.pack
     fromText = T.unpack
@@ -509,3 +613,176 @@ instance ConvText L.ByteString where
 instance ConvText T.Text where
     toText   = id
     fromText = id
+
+-- | Polymorphic container of a string
+--
+-- When operations take place on multiple 'GenString's, they are first
+-- converted to the type 'GenStringDefault', which are lazy bytestrings,
+-- whenever absolutely necessary (which includes testing for equality,
+-- appending strings, concatenating lists of strings, empty strings with
+-- 'empty', and unfolding), making them the most efficient type for this
+-- type.
+data GenString = forall s. (StringCells s) => GenString {gen_string :: s}
+    deriving (Typeable)
+
+toGenDefaultString :: (StringCells s) => s -> GenStringDefault
+toGenDefaultString = toStringCells
+
+genStringKey :: GenString
+genStringKey = keyStringCells
+
+instance Eq GenString where
+    _a == _b = case (_a, _b) of
+        ((GenString _a), (GenString _b)) -> toGenDefaultString _a == toGenDefaultString _b
+    _a /= _b = case (_a, _b) of
+        ((GenString _a), (GenString _b)) -> toGenDefaultString _a /= toGenDefaultString _b
+
+instance StringCells GenString where
+    -- These associated types were rather arbitrarily chosen
+    type StringCellChar GenString = Char
+    type StringCellAltChar GenString = Word8
+
+    toStringCells   = fromGenString
+    fromStringCells = toGenString
+
+    cons c _s = case _s of
+        (GenString _s) -> GenString $ cons (toMainChar _s c) _s
+    uncons _s = case _s of
+        (GenString _s) -> let (c, s') = uncons _s
+                          in  (toMainChar genStringKey c, GenString s')
+    snoc _s c = case _s of
+        (GenString _s) -> GenString $ snoc _s (toMainChar _s c)
+    unsnoc _s = case _s of
+        (GenString _s) -> let (s', c) = unsnoc _s
+                          in  (GenString s', toMainChar genStringKey c)
+
+    altCons c _s = case _s of
+        (GenString _s) -> GenString $ cons (fromWord8 c) _s
+    altUncons _s = case _s of
+        (GenString _s) -> let (c, s') = uncons _s
+                          in  (toAltChar genStringKey c, GenString s')
+    altSnoc _s c = case _s of
+        (GenString _s) -> GenString $ snoc _s (fromWord8 c)
+    altUnsnoc _s = case _s of
+        (GenString _s) -> let (s', c) = unsnoc _s
+                          in  (GenString s', toAltChar genStringKey c)
+
+    toMainChar = const toChar
+    toAltChar  = const toWord8
+
+    append a b = case (a, b) of
+        (GenString _a, GenString _b) -> GenString $ append (toGenDefaultString _a) (toGenDefaultString _b)
+    concat ss = GenString $ concat . map toGenDefaultString $ ss
+
+    empty = GenString $ (empty :: GenStringDefault)
+    null _s = case _s of
+        (GenString _s) -> null _s
+
+    head _s = case _s of
+        (GenString _s) -> toMainChar genStringKey $ head _s
+    tail _s = case _s of
+        (GenString _s) -> GenString $ tail _s
+    last _s = case _s of
+        (GenString _s) -> toMainChar genStringKey $ last _s
+    init _s = case _s of
+        (GenString _s) -> GenString $ init _s
+    altHead _s = case _s of
+        (GenString _s) -> toAltChar genStringKey $ head _s
+    altLast _s = case _s of
+        (GenString _s) -> toAltChar genStringKey $ last _s
+
+    unfoldr       f z = GenString $ (altUnfoldr    f z  :: GenStringDefault)
+    altUnfoldr    f z = GenString $ (unfoldr       f z  :: GenStringDefault)
+    unfoldrN    n f z = GenString $ (altUnfoldrN n f z  :: GenStringDefault)
+    altUnfoldrN n f z = GenString $ (unfoldrN    n f z  :: GenStringDefault)
+
+    index _s i = case _s of
+        (GenString _s) -> toMainChar genStringKey $ index _s i
+    index64 _s i = case _s of
+        (GenString _s) -> toMainChar genStringKey $ index64 _s i
+    genericIndex _s i = case _s of
+        (GenString _s) -> toMainChar genStringKey $ genericIndex _s i
+
+    take n _s = case _s of
+        (GenString _s) -> GenString $ take n _s
+    take64 n _s = case _s of
+        (GenString _s) -> GenString $ take64 n _s
+    genericTake n _s = case _s of
+        (GenString _s) -> GenString $ genericTake n _s
+    drop n _s = case _s of
+        (GenString _s) -> GenString $ drop n _s
+    drop64 n _s = case _s of
+        (GenString _s) -> GenString $ drop64 n _s
+    genericDrop n _s = case _s of
+        (GenString _s) -> GenString $ genericDrop n _s
+
+    length _s = case _s of
+        (GenString _s) -> length _s
+    length64 _s = case _s of
+        (GenString _s) -> length64 _s
+    genericLength _s = case _s of
+        (GenString _s) -> genericLength _s
+
+    safeUncons _s = case _s of
+        (GenString _s) -> (\(c, s') -> (toMainChar genStringKey c, GenString s')) <$> safeUncons _s
+    safeUnsnoc _s = case _s of
+        (GenString _s) -> (\(s', c) -> (GenString s', toMainChar genStringKey c)) <$> safeUnsnoc _s
+    safeAltUncons _s = case _s of
+        (GenString _s) -> (\(c, s') -> (toAltChar genStringKey c, GenString s')) <$> safeAltUncons _s
+    safeAltUnsnoc _s = case _s of
+        (GenString _s) -> (\(s', c) -> (GenString s', toAltChar genStringKey c)) <$> safeAltUnsnoc _s
+    safeHead _s = case _s of
+        (GenString _s) -> toMainChar genStringKey <$> safeHead _s
+    safeTail _s = case _s of
+        (GenString _s) -> GenString <$> safeTail _s
+    safeLast _s = case _s of
+        (GenString _s) -> toMainChar genStringKey <$> safeLast _s
+    safeInit _s = case _s of
+        (GenString _s) -> GenString <$> safeInit _s
+    safeAltHead _s = case _s of
+        (GenString _s) -> toAltChar  genStringKey <$> safeAltHead _s
+    safeAltLast _s = case _s of
+        (GenString _s) -> toAltChar  genStringKey <$> safeAltLast _s
+    safeIndex _s i = case _s of
+        (GenString _s) -> toMainChar genStringKey <$> safeIndex _s i
+    safeIndex64 _s i = case _s of
+        (GenString _s) -> toMainChar genStringKey <$> safeIndex64 _s i
+    safeGenericIndex _s i = case _s of
+        (GenString _s) -> toMainChar genStringKey <$> safeGenericIndex _s i
+    safeTake n _s = case _s of
+        (GenString _s) -> GenString <$> safeTake n _s
+    safeTake64 n _s = case _s of
+        (GenString _s) -> GenString <$> safeTake64 n _s
+    safeGenericTake n _s = case _s of
+        (GenString _s) -> GenString <$> safeGenericTake n _s
+    safeDrop n _s = case _s of
+        (GenString _s) -> GenString <$> safeDrop n _s
+    safeDrop64 n _s = case _s of
+        (GenString _s) -> GenString <$> safeDrop64 n _s
+    safeGenericDrop n _s = case _s of
+        (GenString _s) -> GenString <$> safeGenericDrop n _s
+    safeUncons2 _s = case _s of
+        (GenString _s) -> (\(a, b, s') -> (toMainChar genStringKey a, toMainChar genStringKey b, GenString s')) <$> safeUncons2 _s
+    safeUncons3 _s = case _s of
+        (GenString _s) -> (\(a, b, c, s') -> (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, GenString s')) <$> safeUncons3 _s
+    safeUncons4 _s = case _s of
+        (GenString _s) -> (\(a, b, c, d, s') -> (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, toMainChar genStringKey d, GenString s')) <$> safeUncons4 _s
+
+    cons2 a b _s = case _s of
+        (GenString _s) -> GenString $ cons2 (toMainChar _s a) (toMainChar _s b) _s
+    cons3 a b c _s = case _s of
+        (GenString _s) -> GenString $ cons3 (toMainChar _s a) (toMainChar _s b) (toMainChar _s c) _s
+    cons4 a b c d _s = case _s of
+        (GenString _s) -> GenString $ cons4 (toMainChar _s a) (toMainChar _s b) (toMainChar _s c) (toMainChar _s d) _s
+    uncons2 _s = case _s of
+        (GenString _s) -> let (a, b, s') = uncons2 _s
+                          in  (toMainChar genStringKey a, toMainChar genStringKey b, GenString s')
+    uncons3 _s = case _s of
+        (GenString _s) -> let (a, b, c, s') = uncons3 _s
+                          in  (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, GenString s')
+    uncons4 _s = case _s of
+        (GenString _s) -> let (a, b, c, d, s') = uncons4 _s
+                          in  (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, toMainChar genStringKey d, GenString s')
+
+-- | This type is used by 'GenString' when a concrete string type is needed
+type GenStringDefault = L.ByteString
