@@ -1,7 +1,5 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable #-}
 
--- | This module is mostly self-explanatory
-
 module Data.String.Class
     ( StringCells(..)
     , StringCell(..)
@@ -72,7 +70,7 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenS
     altHead :: s -> StringCellAltChar s
     altLast :: s -> StringCellAltChar s
 
-    -- | Construction of a string; implementations should behave safely with invalid lengths
+    -- | Construction of a string; implementations should behave safely with incorrect lengths
     --
     -- The default implementation of 'undfoldr' is independent from that of 'altUnfoldr',
     -- as well as 'unfoldrN' as and 'altUnfoldrN'.
@@ -95,17 +93,18 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenS
 
     -- | Get the character at the given position
     --
-    -- The default definitions are independent of each other,
-    -- and work in terms of 'head' and 'tail', which can be
+    -- Just like 'drop', 'drop64', and the variants of those functions, the
+    -- default definitions of these three variants are independent of each
+    -- other, and are defined in terms of 'head' and 'tail', which can be
     -- inefficient.
     index   :: s -> Int   -> StringCellChar s
     index64 :: s -> Int64 -> StringCellChar s
     -- | Index a string at any location
     --
-    -- This function can be significantly slower than 'index', since
-    -- the function must be able to support arbitrarily large
-    -- indices.  Consider using 'index' or 'index64', even if you need to
-    -- coerce the index to an 'Int'.
+    -- Just like the other 'generic' functions of this module, this function
+    -- can be significantly slower than 'index', since the function must be
+    -- able to support arbitrarily large indices.  Consider using 'index' or
+    -- 'index64', even if you need to coerce the index to an 'Int'.
     genericIndex :: (Integral i) => s -> i -> StringCellChar s
 
     take        :: Int -> s -> s
@@ -621,7 +620,7 @@ instance ConvText T.Text where
 -- whenever absolutely necessary (which includes testing for equality,
 -- appending strings, concatenating lists of strings, empty strings with
 -- 'empty', and unfolding), making them the most efficient type for this
--- type.
+-- polymorphic container.
 data GenString = forall s. (StringCells s) => GenString {gen_string :: s}
     deriving (Typeable)
 
