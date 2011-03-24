@@ -21,13 +21,12 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Int
 import qualified Data.List as List
+import Data.Tagged
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TEE
 import Data.Typeable
 import Data.Word
-
-type Unused a = a
 
 -- | Minimal complete definition: StringCellChar; StringCellAltChar; toStringCells; fromStringCells; toMainChar; toAltChar; cons; snoc; either all of head, tail, last, and init, or all of uncons and unsnoc; take, take64 or genericTake; drop, drop64, or genericDrop; length, length64, or genericLength; empty; null; and concat
 class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s, Eq s, Typeable s) => StringCells s where
@@ -50,10 +49,8 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenS
     altSnoc   :: s -> StringCellAltChar s -> s
     altUnsnoc :: s -> (s, StringCellAltChar s)
 
-    -- | The unused parameter is only needed for its type and should be ignored in the function definition
-    toMainChar :: (StringCell c) => Unused s -> c -> StringCellChar s
-    -- | The unused parameter is only needed for its type and should be ignored in the function definition
-    toAltChar  :: (StringCell c) => Unused s -> c -> StringCellAltChar s
+    toMainChar :: (StringCell c) => c -> Tagged s (StringCellChar s)
+    toAltChar  :: (StringCell c) => c -> Tagged s (StringCellAltChar s)
 
     -- | Append two strings
     infixr 9 `append`
@@ -154,23 +151,17 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenS
     uncons3 :: s -> (StringCellChar s, StringCellChar s, StringCellChar s, s)
     uncons4 :: s -> (StringCellChar s, StringCellChar s, StringCellChar s, StringCellChar s, s)
 
-    -- | An undefined value meant to disambiguate which instance of 'toMainChar' or 'toAltChar' to use
-    --
-    -- It is thus normally unnecessary to define in instances.
-    keyStringCells :: s
-    keyStringCells = undefined
-
-    altCons c s = cons (toMainChar s c) s
-    altSnoc s c = snoc s (toMainChar s c)
-    altUncons s = (\ ~(a, s') -> (toAltChar s a, s')) $ uncons s
-    altUnsnoc s = (\ ~(s', a) -> (s', toAltChar s a)) $ unsnoc s
+    altCons c s = cons (s `untagTypeOf` toMainChar c) s
+    altSnoc s c = snoc s (s `untagTypeOf` toMainChar c)
+    altUncons s = (\ ~(a, s') -> (s `untagTypeOf` toAltChar a, s')) $ uncons s
+    altUnsnoc s = (\ ~(s', a) -> (s', s `untagTypeOf` toAltChar a)) $ unsnoc s
 
     head = fst . uncons
     tail = snd . uncons
     last = snd . unsnoc
     init = fst . unsnoc
-    altHead s = toAltChar s . head $ s
-    altLast s = toAltChar s . last $ s
+    altHead s = (s `untagTypeOf`) . toAltChar . head $ s
+    altLast s = (s `untagTypeOf`) . toAltChar . last $ s
 
     index        s 0 = head s
     index        s n = (flip index $ pred n) . tail $ s
@@ -341,8 +332,8 @@ instance StringCells String where
     safeUncons _      = Nothing
     uncons (x:xs) = (x, xs)
     uncons _      = error "String.uncons: null string"
-    toMainChar _  = toChar
-    toAltChar  _  = toChar
+    toMainChar    = Tagged . toChar
+    toAltChar     = Tagged . toChar
     head          = List.head
     tail          = List.tail
     init          = List.init
@@ -372,8 +363,8 @@ instance StringCells S.ByteString where
     snoc            = S.snoc
     safeUncons      = S.uncons
     uncons          = maybe (error "StringCells.Data.ByteString.ByteString.uncons: string is null") id . safeUncons
-    toMainChar _    = toWord8
-    toAltChar  _    = toChar
+    toMainChar      = Tagged . toWord8
+    toAltChar       = Tagged . toChar
     head            = S.head
     tail            = S.tail
     init            = S.init
@@ -404,8 +395,8 @@ instance StringCells L.ByteString where
     snoc            = L.snoc
     safeUncons      = L.uncons
     uncons          = maybe (error "StringCells.Data.ByteString.Lazy.ByteString.uncons: string is null") id . safeUncons
-    toMainChar _    = toWord8
-    toAltChar  _    = toChar
+    toMainChar      = Tagged . toWord8
+    toAltChar       = Tagged . toChar
     head            = L.head
     tail            = L.tail
     init            = L.init
@@ -434,8 +425,8 @@ instance StringCells T.Text where
     uncons          = maybe (error "StringCells.Data.Text.Text.uncons: string is null") id . safeUncons
     snoc            = T.snoc
     altSnoc         = T.snoc
-    toMainChar _    = toChar
-    toAltChar  _    = toChar
+    toMainChar      = Tagged . toChar
+    toAltChar       = Tagged . toChar
     head            = T.head
     tail            = T.tail
     init            = T.init
@@ -627,9 +618,6 @@ data GenString = forall s. (StringCells s) => GenString {gen_string :: s}
 toGenDefaultString :: (StringCells s) => s -> GenStringDefault
 toGenDefaultString = toStringCells
 
-genStringKey :: GenString
-genStringKey = keyStringCells
-
 instance Eq GenString where
     _a == _b = case (_a, _b) of
         ((GenString _a), (GenString _b)) -> toGenDefaultString _a == toGenDefaultString _b
@@ -645,29 +633,29 @@ instance StringCells GenString where
     fromStringCells = toGenString
 
     cons c _s = case _s of
-        (GenString _s) -> GenString $ cons (toMainChar _s c) _s
+        (GenString _s) -> GenString $ cons (_s `untagTypeOf` toMainChar c) _s
     uncons _s = case _s of
         (GenString _s) -> let (c, s') = uncons _s
-                          in  (toMainChar genStringKey c, GenString s')
+                          in  (genStringPhantom `untagTypeOf` toMainChar c, GenString s')
     snoc _s c = case _s of
-        (GenString _s) -> GenString $ snoc _s (toMainChar _s c)
+        (GenString _s) -> GenString $ snoc _s (_s `untagTypeOf` toMainChar c)
     unsnoc _s = case _s of
         (GenString _s) -> let (s', c) = unsnoc _s
-                          in  (GenString s', toMainChar genStringKey c)
+                          in  (GenString s', genStringPhantom `untagTypeOf` toMainChar c)
 
     altCons c _s = case _s of
         (GenString _s) -> GenString $ cons (fromWord8 c) _s
     altUncons _s = case _s of
         (GenString _s) -> let (c, s') = uncons _s
-                          in  (toAltChar genStringKey c, GenString s')
+                          in  (genStringPhantom `untagTypeOf` toAltChar c, GenString s')
     altSnoc _s c = case _s of
         (GenString _s) -> GenString $ snoc _s (fromWord8 c)
     altUnsnoc _s = case _s of
         (GenString _s) -> let (s', c) = unsnoc _s
-                          in  (GenString s', toAltChar genStringKey c)
+                          in  (GenString s', genStringPhantom `untagTypeOf` toAltChar c)
 
-    toMainChar = const toChar
-    toAltChar  = const toWord8
+    toMainChar = Tagged . toChar
+    toAltChar  = Tagged . toWord8
 
     append a b = case (a, b) of
         (GenString _a, GenString _b) -> GenString $ append (toGenDefaultString _a) (toGenDefaultString _b)
@@ -678,17 +666,17 @@ instance StringCells GenString where
         (GenString _s) -> null _s
 
     head _s = case _s of
-        (GenString _s) -> toMainChar genStringKey $ head _s
+        (GenString _s) -> genStringPhantom `untagTypeOf` toMainChar (head _s)
     tail _s = case _s of
         (GenString _s) -> GenString $ tail _s
     last _s = case _s of
-        (GenString _s) -> toMainChar genStringKey $ last _s
+        (GenString _s) -> genStringPhantom `untagTypeOf` toMainChar (last _s)
     init _s = case _s of
         (GenString _s) -> GenString $ init _s
     altHead _s = case _s of
-        (GenString _s) -> toAltChar genStringKey $ head _s
+        (GenString _s) -> genStringPhantom `untagTypeOf` toAltChar (head _s)
     altLast _s = case _s of
-        (GenString _s) -> toAltChar genStringKey $ last _s
+        (GenString _s) -> genStringPhantom `untagTypeOf` toAltChar (last _s)
 
     unfoldr       f z = GenString $ (altUnfoldr    f z  :: GenStringDefault)
     altUnfoldr    f z = GenString $ (unfoldr       f z  :: GenStringDefault)
@@ -696,11 +684,11 @@ instance StringCells GenString where
     altUnfoldrN n f z = GenString $ (unfoldrN    n f z  :: GenStringDefault)
 
     index _s i = case _s of
-        (GenString _s) -> toMainChar genStringKey $ index _s i
+        (GenString _s) -> genStringPhantom `untagTypeOf` toMainChar (index _s i)
     index64 _s i = case _s of
-        (GenString _s) -> toMainChar genStringKey $ index64 _s i
+        (GenString _s) -> genStringPhantom `untagTypeOf` toMainChar (index64 _s i)
     genericIndex _s i = case _s of
-        (GenString _s) -> toMainChar genStringKey $ genericIndex _s i
+        (GenString _s) -> genStringPhantom `untagTypeOf` toMainChar (genericIndex _s i)
 
     take n _s = case _s of
         (GenString _s) -> GenString $ take n _s
@@ -723,31 +711,31 @@ instance StringCells GenString where
         (GenString _s) -> genericLength _s
 
     safeUncons _s = case _s of
-        (GenString _s) -> (\(c, s') -> (toMainChar genStringKey c, GenString s')) <$> safeUncons _s
+        (GenString _s) -> (\(c, s') -> (genStringPhantom `untagTypeOf` toMainChar c, GenString s')) <$> safeUncons _s
     safeUnsnoc _s = case _s of
-        (GenString _s) -> (\(s', c) -> (GenString s', toMainChar genStringKey c)) <$> safeUnsnoc _s
+        (GenString _s) -> (\(s', c) -> (GenString s', genStringPhantom `untagTypeOf` toMainChar c)) <$> safeUnsnoc _s
     safeAltUncons _s = case _s of
-        (GenString _s) -> (\(c, s') -> (toAltChar genStringKey c, GenString s')) <$> safeAltUncons _s
+        (GenString _s) -> (\(c, s') -> (genStringPhantom `untagTypeOf` toAltChar c, GenString s')) <$> safeAltUncons _s
     safeAltUnsnoc _s = case _s of
-        (GenString _s) -> (\(s', c) -> (GenString s', toAltChar genStringKey c)) <$> safeAltUnsnoc _s
+        (GenString _s) -> (\(s', c) -> (GenString s', genStringPhantom `untagTypeOf` toAltChar c)) <$> safeAltUnsnoc _s
     safeHead _s = case _s of
-        (GenString _s) -> toMainChar genStringKey <$> safeHead _s
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toMainChar <$> safeHead _s
     safeTail _s = case _s of
         (GenString _s) -> GenString <$> safeTail _s
     safeLast _s = case _s of
-        (GenString _s) -> toMainChar genStringKey <$> safeLast _s
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toMainChar <$> safeLast _s
     safeInit _s = case _s of
         (GenString _s) -> GenString <$> safeInit _s
     safeAltHead _s = case _s of
-        (GenString _s) -> toAltChar  genStringKey <$> safeAltHead _s
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toAltChar  <$> safeAltHead _s
     safeAltLast _s = case _s of
-        (GenString _s) -> toAltChar  genStringKey <$> safeAltLast _s
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toAltChar  <$> safeAltLast _s
     safeIndex _s i = case _s of
-        (GenString _s) -> toMainChar genStringKey <$> safeIndex _s i
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toMainChar <$> safeIndex _s i
     safeIndex64 _s i = case _s of
-        (GenString _s) -> toMainChar genStringKey <$> safeIndex64 _s i
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toMainChar <$> safeIndex64 _s i
     safeGenericIndex _s i = case _s of
-        (GenString _s) -> toMainChar genStringKey <$> safeGenericIndex _s i
+        (GenString _s) -> (genStringPhantom `untagTypeOf`) . toMainChar <$> safeGenericIndex _s i
     safeTake n _s = case _s of
         (GenString _s) -> GenString <$> safeTake n _s
     safeTake64 n _s = case _s of
@@ -761,27 +749,40 @@ instance StringCells GenString where
     safeGenericDrop n _s = case _s of
         (GenString _s) -> GenString <$> safeGenericDrop n _s
     safeUncons2 _s = case _s of
-        (GenString _s) -> (\(a, b, s') -> (toMainChar genStringKey a, toMainChar genStringKey b, GenString s')) <$> safeUncons2 _s
+        (GenString _s) -> (\(a, b, s') -> (genStringPhantom `untagTypeOf` toMainChar a, genStringPhantom `untagTypeOf` toMainChar b, GenString s')) <$> safeUncons2 _s
     safeUncons3 _s = case _s of
-        (GenString _s) -> (\(a, b, c, s') -> (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, GenString s')) <$> safeUncons3 _s
+        (GenString _s) -> (\(a, b, c, s') -> (genStringPhantom `untagTypeOf` toMainChar a, genStringPhantom `untagTypeOf` toMainChar b, genStringPhantom `untagTypeOf` toMainChar c, GenString s')) <$> safeUncons3 _s
     safeUncons4 _s = case _s of
-        (GenString _s) -> (\(a, b, c, d, s') -> (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, toMainChar genStringKey d, GenString s')) <$> safeUncons4 _s
+        (GenString _s) -> (\(a, b, c, d, s') -> (genStringPhantom `untagTypeOf` toMainChar a, genStringPhantom `untagTypeOf` toMainChar b, genStringPhantom `untagTypeOf` toMainChar c, genStringPhantom `untagTypeOf` toMainChar d, GenString s')) <$> safeUncons4 _s
 
     cons2 a b _s = case _s of
-        (GenString _s) -> GenString $ cons2 (toMainChar _s a) (toMainChar _s b) _s
+        (GenString _s) -> GenString $ cons2 (_s `untagTypeOf` toMainChar a) (_s `untagTypeOf` toMainChar b) _s
     cons3 a b c _s = case _s of
-        (GenString _s) -> GenString $ cons3 (toMainChar _s a) (toMainChar _s b) (toMainChar _s c) _s
+        (GenString _s) -> GenString $ cons3 (_s `untagTypeOf` toMainChar a) (_s `untagTypeOf` toMainChar b) (_s `untagTypeOf` toMainChar c) _s
     cons4 a b c d _s = case _s of
-        (GenString _s) -> GenString $ cons4 (toMainChar _s a) (toMainChar _s b) (toMainChar _s c) (toMainChar _s d) _s
+        (GenString _s) -> GenString $ cons4 (_s `untagTypeOf` toMainChar a) (_s `untagTypeOf` toMainChar b) (_s `untagTypeOf` toMainChar c) (_s `untagTypeOf` toMainChar d) _s
     uncons2 _s = case _s of
         (GenString _s) -> let (a, b, s') = uncons2 _s
-                          in  (toMainChar genStringKey a, toMainChar genStringKey b, GenString s')
+                          in  (genStringPhantom `untagTypeOf` toMainChar a, genStringPhantom `untagTypeOf` toMainChar b, GenString s')
     uncons3 _s = case _s of
         (GenString _s) -> let (a, b, c, s') = uncons3 _s
-                          in  (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, GenString s')
+                          in  (genStringPhantom `untagTypeOf` toMainChar a, genStringPhantom `untagTypeOf` toMainChar b, genStringPhantom `untagTypeOf` toMainChar c, GenString s')
     uncons4 _s = case _s of
         (GenString _s) -> let (a, b, c, d, s') = uncons4 _s
-                          in  (toMainChar genStringKey a, toMainChar genStringKey b, toMainChar genStringKey c, toMainChar genStringKey d, GenString s')
+                          in  (genStringPhantom `untagTypeOf` toMainChar a, genStringPhantom `untagTypeOf` toMainChar b, genStringPhantom `untagTypeOf` toMainChar c, genStringPhantom `untagTypeOf` toMainChar d, GenString s')
+
+-- | Untag a type with a type restriction
+--
+-- The first argument is guaranteed to be ignored; thus the value 'undefined'
+-- can be passed in its place.
+untagTypeOf :: s -> Tagged s b -> b
+untagTypeOf _ = untag
+
+-- | Phantom, undefined value only used for convenience
+--
+-- Users should be careful that this value is never evaluated when using this.
+genStringPhantom :: GenString
+genStringPhantom = undefined
 
 -- | This type is used by 'GenString' when a concrete string type is needed
 type GenStringDefault = L.ByteString
