@@ -9,7 +9,7 @@ author:                Byron James Johnson
 maintainer:            KrabbyKrap@gmail.com
 synopsis:              String class library
 description:           String class library
-category:              Data
+category:              Data, Text
 tested-with:           GHC == 7.0.1
 
 library
