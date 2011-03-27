@@ -1,8 +1,10 @@
-{-# LANGUAGE TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable #-}
+{-# LANGUAGE TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable, FlexibleInstances, UndecidableInstances #-}
 
 module Data.String.Class
-    ( StringCells(..)
+    ( Stringy
+    , StringCells(..)
     , StringCell(..)
+    , StringRWIO(..)
     , ConvGenString(..)
     , ConvString(..)
     , ConvStrictByteString(..)
@@ -12,7 +14,7 @@ module Data.String.Class
     , GenStringDefault
     ) where
 
-import Prelude hiding (head, tail, last, init, take, drop, length, null, concat)
+import Prelude hiding (head, tail, last, init, take, drop, length, null, concat, putStr, getContents)
 import Control.Applicative hiding (empty)
 import qualified Data.ByteString as S
 import qualified Data.ByteString.Char8 as SC
@@ -25,8 +27,14 @@ import Data.Tagged
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TEE
+import qualified Data.Text.IO as T
 import Data.Typeable
 import Data.Word
+import qualified System.IO as IO
+
+-- | String super class
+class    (StringCells s, StringRWIO s) => Stringy s
+instance (StringCells s, StringRWIO s) => Stringy s
 
 -- | Minimal complete definition: StringCellChar; StringCellAltChar; toStringCells; fromStringCells; toMainChar; toAltChar; cons; snoc; either all of head, tail, last, and init, or all of uncons and unsnoc; take, take64 or genericTake; drop, drop64, or genericDrop; length, length64, or genericLength; empty; null; and concat
 class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s, Eq s, Typeable s) => StringCells s where
@@ -313,6 +321,78 @@ class ConvLazyByteString s where
 class ConvText s where
     toText :: s -> T.Text
     fromText :: T.Text -> s
+
+-- | Minimal complete definition: 'hGetContents', 'hGetLine', 'hPutStr', and 'hPutStrLn'
+class StringRWIO s where
+    -- * Handles
+
+    -- | Read n bytes *or* characters, depending on the implementation into a
+    -- ByteString, directly from the specified Handle
+    --
+    -- Whether or not this function is lazy depends on the instance; laziness
+    -- is preferred.
+    hGetContents :: IO.Handle -> IO s
+
+    -- | Read a single line from a handle
+    hGetLine :: IO.Handle -> IO s
+
+    -- | Write a string to a handle
+    hPutStr :: IO.Handle -> s -> IO ()
+
+    -- | Write a string to a handle, followed by a newline
+    --
+    -- N.B.: implementations might not define this atomically.  If the state
+    -- of being atomic is necessary, one possible solution is to convert a
+    -- string to an efficient type for which 'hPutStrLn' is atomic.
+    hPutStrLn :: IO.Handle -> s -> IO ()
+
+    -- * Special cases for standard input and output
+
+    -- | Take a function of type Text -> Text as its argument
+    --
+    -- The entire input from the standard input device is passed to this
+    -- function as its argument, and the resulting string is output on the
+    -- standard output device.
+    interact :: (s -> s) -> IO ()
+    interact f = putStr . f =<< getContents
+
+    -- | Read all user input on 'stdin' as a single string
+    getContents :: IO s
+    getContents = hGetContents IO.stdin
+
+    -- | Read a single line of user input from 'stdin'
+    getLine :: IO s
+    getLine = hGetLine IO.stdin
+
+    -- | Write a string to 'stdout'
+    putStr :: s -> IO ()
+    putStr = hPutStr IO.stdout
+
+    -- | Write a string to 'stdout', followed by a newline
+    putStrLn :: s -> IO ()
+    putStrLn = hPutStrLn IO.stdout
+
+    -- *
+
+    -- | Read a file and returns the contents of the file as a string
+    --
+    -- Depending on the instance, this function might expect the file to be
+    -- non-binary.  The default definition uses 'openFile' to open the file.
+    readFile :: FilePath -> IO s
+    readFile fn = hGetContents =<< IO.openFile fn IO.ReadMode
+
+    -- | Write a string to a file
+    --
+    -- The file is truncated to zero length before writing begins.
+    -- The default definition uses 'withFile' to open the file.
+    writeFile :: FilePath -> s -> IO ()
+    writeFile fn s = IO.withFile fn IO.WriteMode $ \hdl -> hPutStr hdl s
+
+    -- | Write a string to the end of a file
+    --
+    -- The default definition uses 'withFile' to open the file.
+    appendFile :: FilePath -> s -> IO ()
+    appendFile fn s = IO.withFile fn IO.AppendMode $ \hdl -> hPutStr hdl s
 
 
 
@@ -604,6 +684,141 @@ instance ConvText T.Text where
     toText   = id
     fromText = id
 
+-- |
+--
+-- This is minimally defined with 'GenStringDefault'.
+instance StringRWIO GenString where
+    hGetContents h = genStringFromConConv <$> hGetContents h
+
+    hGetLine h = genStringFromConConv <$> hGetLine h
+
+    hPutStr h s = hPutStr h (genStringConConv s)
+
+    hPutStrLn h s = hPutStrLn h (genStringConConv s)
+
+-- | Type-restricted string conversion used by 'GenString's instance definition for 'StringRWIO'
+genStringConConv :: GenString -> GenStringDefault
+genStringConConv = toStringCells
+
+-- | Type-restricted string conversion used by 'GenString's instance definition for 'StringRWIO'
+genStringFromConConv :: GenStringDefault -> GenString
+genStringFromConConv = toStringCells
+
+-- |
+--
+-- See 'System.IO for documentation of behaviour.
+instance StringRWIO String where
+    hGetContents = IO.hGetContents
+
+    hGetLine     = IO.hGetLine
+
+    hPutStr      = IO.hPutStr
+
+    hPutStrLn    = IO.hPutStrLn
+
+    interact     = IO.interact
+
+    getContents  = IO.getContents
+
+    getLine      = IO.getLine
+
+    putStr       = IO.putStr
+
+    putStrLn     = IO.putStrLn
+
+    readFile     = IO.readFile
+
+    writeFile    = IO.writeFile
+
+    appendFile   = IO.appendFile
+
+-- |
+--
+-- See 'Data.ByteString' for documentation of behaviour.
+instance StringRWIO S.ByteString where
+    hGetContents = S.hGetContents
+
+    hGetLine     = S.hGetLine
+
+    hPutStr      = S.hPutStr
+
+    hPutStrLn    = S.hPutStrLn
+
+    interact     = S.interact
+
+    getContents  = S.getContents
+
+    getLine      = S.getLine
+
+    putStr       = S.putStr
+
+    putStrLn     = S.putStrLn
+
+    readFile     = S.readFile
+
+    writeFile    = S.writeFile
+
+    appendFile   = S.appendFile
+
+-- |
+--
+-- See 'Data.ByteString.Lazy' for documentation of behaviour.
+--
+-- 'hGetLine' and 'getLine' are defined in terms of 'toStringCells' and the equivalent methods of 'Data.ByteString'.
+-- 'hPutStrLn' is defined non-atomically: it is defined as an action that puts the string and then separately puts a newline character string.
+instance StringRWIO L.ByteString where
+    hGetContents = L.hGetContents
+
+    hGetLine     = (toStringCells <$>) . S.hGetLine
+
+    hPutStr      = L.hPutStr
+
+    hPutStrLn h  = (>> hPutStr h ((toStringCells :: String -> L.ByteString) ['\n'])) . hPutStr h
+
+    interact     = L.interact
+
+    getContents  = L.getContents
+
+    getLine      = toStringCells <$> S.getLine
+
+    putStr       = L.putStr
+
+    putStrLn     = L.putStrLn
+
+    readFile     = L.readFile
+
+    writeFile    = L.writeFile
+
+    appendFile   = L.appendFile
+
+-- |
+--
+-- See 'Data.Text.IO' for documentation of behaviour.
+instance StringRWIO T.Text where
+    hGetContents = T.hGetContents
+
+    hGetLine     = T.hGetLine
+
+    hPutStr      = T.hPutStr
+
+    hPutStrLn    = T.hPutStrLn
+
+    interact     = T.interact
+
+    getContents  = T.getContents
+
+    getLine      = T.getLine
+
+    putStr       = T.putStr
+
+    putStrLn     = T.putStrLn
+
+    readFile     = T.readFile
+
+    writeFile    = T.writeFile
+
+    appendFile   = T.appendFile
+
 -- | Polymorphic container of a string
 --
 -- When operations take place on multiple 'GenString's, they are first
@@ -612,10 +827,10 @@ instance ConvText T.Text where
 -- appending strings, concatenating lists of strings, empty strings with
 -- 'empty', and unfolding), making them the most efficient type for this
 -- polymorphic container.
-data GenString = forall s. (StringCells s) => GenString {gen_string :: s}
+data GenString = forall s. (Stringy s) => GenString {gen_string :: s}
     deriving (Typeable)
 
-toGenDefaultString :: (StringCells s) => s -> GenStringDefault
+toGenDefaultString :: (Stringy s) => s -> GenStringDefault
 toGenDefaultString = toStringCells
 
 instance Eq GenString where

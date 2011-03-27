@@ -18,7 +18,7 @@ library
     build-depends:     base >= 4 && < 5, bytestring, text, tagged
     exposed-modules:   Data.String.Class
     ghc-options:       -Wall
-    other-extensions:  TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable
+    other-extensions:  TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable, FlexibleInstances, UndecidableInstances
 
 source-repository head
     type:              darcs
