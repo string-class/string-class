@@ -23,6 +23,9 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Int
 import qualified Data.List as List
+import Data.Monoid
+import Data.String (IsString)
+import qualified Data.String
 import Data.Tagged
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -36,8 +39,8 @@ import qualified System.IO as IO
 class    (StringCells s, StringRWIO s) => Stringy s
 instance (StringCells s, StringRWIO s) => Stringy s
 
--- | Minimal complete definition: StringCellChar; StringCellAltChar; toStringCells; fromStringCells; toMainChar; toAltChar; cons; snoc; either all of head, tail, last, and init, or all of uncons and unsnoc; take, take64 or genericTake; drop, drop64, or genericDrop; length, length64, or genericLength; empty; null; and concat
-class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s, Eq s, Typeable s) => StringCells s where
+-- | Minimal complete definition: StringCellChar; StringCellAltChar; toStringCells; fromStringCells; toMainChar; toAltChar; cons; snoc; either all of head, tail, last, and init, or all of uncons and unsnoc; take, take64 or genericTake; drop, drop64, or genericDrop; and length, length64, or genericLength
+class (Eq s, Monoid s, IsString s, Typeable s, StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s) => StringCells s where
     type StringCellChar s
     type StringCellAltChar s
 
@@ -164,6 +167,11 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenS
     altUncons s = (\ ~(a, s') -> (s `untagTypeOf` toAltChar a, s')) $ uncons s
     altUnsnoc s = (\ ~(s', a) -> (s', s `untagTypeOf` toAltChar a)) $ unsnoc s
 
+    append = mappend
+    concat = mconcat
+    empty  = mempty
+    null   = (== mempty)
+
     head = fst . uncons
     tail = snd . uncons
     last = snd . unsnoc
@@ -189,11 +197,14 @@ class (StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenS
     length64      = (fromIntegral :: Integer -> Int64) . genericLength
     genericLength = fromIntegral . length
 
+    {-
+    -- More efficient default implementation provided above
     append a b = case safeUncons a of
         (Just (c, cs)) -> c `cons` append cs b
         (Nothing)      -> a
 
     concat = foldr append empty
+    -}
 
     uncons s = (head s, tail s)
     unsnoc s = (init s, last s)
@@ -839,6 +850,15 @@ instance Eq GenString where
     _a /= _b = case (_a, _b) of
         ((GenString _a), (GenString _b)) -> toGenDefaultString _a /= toGenDefaultString _b
 
+instance IsString GenString where
+    fromString = GenString
+
+instance Monoid GenString where
+    mempty  = GenString $ (empty :: GenStringDefault)
+    mappend a b = case (a, b) of
+        (GenString _a, GenString _b) -> GenString $ append (toGenDefaultString _a) (toGenDefaultString _b)
+    mconcat ss = GenString $ concat . map toGenDefaultString $ ss
+
 instance StringCells GenString where
     -- These associated types were rather arbitrarily chosen
     type StringCellChar GenString = Char
@@ -872,11 +892,6 @@ instance StringCells GenString where
     toMainChar = Tagged . toChar
     toAltChar  = Tagged . toWord8
 
-    append a b = case (a, b) of
-        (GenString _a, GenString _b) -> GenString $ append (toGenDefaultString _a) (toGenDefaultString _b)
-    concat ss = GenString $ concat . map toGenDefaultString $ ss
-
-    empty = GenString $ (empty :: GenStringDefault)
     null _s = case _s of
         (GenString _s) -> null _s
 
