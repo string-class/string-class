@@ -335,7 +335,7 @@ class ConvText s where
 
 -- | Minimal complete definition: 'hGetContents', 'hGetLine', 'hPutStr', and 'hPutStrLn'
 class StringRWIO s where
-    -- * Handles
+    --- Handles
 
     -- | Read n bytes *or* characters, depending on the implementation into a
     -- ByteString, directly from the specified Handle
@@ -357,7 +357,7 @@ class StringRWIO s where
     -- string to an efficient type for which 'hPutStrLn' is atomic.
     hPutStrLn :: IO.Handle -> s -> IO ()
 
-    -- * Special cases for standard input and output
+    --- Special cases for standard input and output
 
     -- | Take a function of type Text -> Text as its argument
     --
@@ -383,7 +383,7 @@ class StringRWIO s where
     putStrLn :: s -> IO ()
     putStrLn = hPutStrLn IO.stdout
 
-    -- *
+    ---
 
     -- | Read a file and returns the contents of the file as a string
     --
