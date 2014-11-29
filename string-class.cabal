@@ -13,20 +13,32 @@ category:              Data, Text
 tested-with:           GHC == 7.8.2
 
 library
-    default-language:  Haskell2010
-    hs-source-dirs:    src
-    -- Haven't thoroughly checked version bounds.
-    -- I added as the minimum version for each non-base package the most recent
-    -- version as of this repository's initial commit.
-    build-depends:
-      base       >= 4        && < 5
-     ,bytestring >= 0.9.1.8  && < 0.11
-     ,text       >= 0.11.0.1 && < 1.3
-     ,tagged     >= 0.1.1    && < 0.8
-    exposed-modules:   Data.String.Class
-    ghc-options:       -Wall
-    other-extensions:  TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable, FlexibleInstances, UndecidableInstances
+  default-language: Haskell2010
+  hs-source-dirs:   src
+  ghc-options:      -Wall
+  default-extensions:
+    --,GADTs
+    --,TemplateHaskell
+    DeriveDataTypeable
+  other-extensions:
+    TypeFamilies
+   ,FlexibleContexts
+   ,TypeSynonymInstances
+   ,ExistentialQuantification
+   ,DeriveDataTypeable
+   ,FlexibleInstances
+   ,UndecidableInstances
+  -- Haven't thoroughly checked version bounds.
+  -- I added as the minimum version for each non-base package the most recent
+  -- version as of this repository's initial commit.
+  build-depends:
+    base       >= 4        && < 5
+   ,bytestring >= 0.9.1.8  && < 0.11
+   ,text       >= 0.11.0.1 && < 1.3
+   ,tagged     >= 0.1.1    && < 0.8
+  exposed-modules:
+    Data.String.Class
 
 source-repository head
-    type:              git
-    location:          git@github.com:bairyn/string-class.git
+  type:     git
+  location: git@github.com:bairyn/string-class.git
