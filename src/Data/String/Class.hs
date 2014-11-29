@@ -753,7 +753,7 @@ instance StringRWIO S.ByteString where
 
     hPutStr      = S.hPutStr
 
-    hPutStrLn    = S.hPutStrLn
+    hPutStrLn    = SC.hPutStrLn
 
     interact     = S.interact
 
@@ -763,7 +763,7 @@ instance StringRWIO S.ByteString where
 
     putStr       = S.putStr
 
-    putStrLn     = S.putStrLn
+    putStrLn     = SC.putStrLn
 
     readFile     = S.readFile
 
@@ -794,7 +794,7 @@ instance StringRWIO L.ByteString where
 
     putStr       = L.putStr
 
-    putStrLn     = L.putStrLn
+    putStrLn     = LC.putStrLn
 
     readFile     = L.readFile
 
