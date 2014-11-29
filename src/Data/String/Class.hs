@@ -31,6 +31,10 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TEE
 import qualified Data.Text.IO as T
+import qualified Data.Text.Lazy as LT
+import qualified Data.Text.Lazy.IO as LT
+import qualified Data.Text.Lazy.Encoding as LTE
+import qualified Data.Text.Lazy.IO as LT
 import Data.Typeable
 import Data.Word
 import qualified System.IO as IO
@@ -40,7 +44,7 @@ class    (StringCells s, StringRWIO s) => Stringy s
 instance (StringCells s, StringRWIO s) => Stringy s
 
 -- | Minimal complete definition: StringCellChar; StringCellAltChar; toStringCells; fromStringCells; toMainChar; toAltChar; cons; snoc; either all of head, tail, last, and init, or all of uncons and unsnoc; take, take64 or genericTake; drop, drop64, or genericDrop; and length, length64, or genericLength
-class (Eq s, Monoid s, IsString s, Typeable s, StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s) => StringCells s where
+class (Eq s, Monoid s, IsString s, Typeable s, StringCell (StringCellChar s), StringCell (StringCellAltChar s), ConvGenString s, ConvString s, ConvStrictByteString s, ConvLazyByteString s, ConvText s, ConvLazyText s) => StringCells s where
     type StringCellChar s
     type StringCellAltChar s
 
@@ -80,12 +84,14 @@ class (Eq s, Monoid s, IsString s, Typeable s, StringCell (StringCellChar s), St
 
     -- | Construction of a string; implementations should behave safely with incorrect lengths
     --
-    -- The default implementation of 'undfoldr' is independent from that of 'altUnfoldr',
+    -- The default implementation of 'unfoldr' is independent from that of 'altUnfoldr',
     -- as well as 'unfoldrN' as and 'altUnfoldrN'.
-    unfoldr     ::        (a -> Maybe (StringCellChar    s, a)) -> a -> s
-    altUnfoldr  ::        (a -> Maybe (StringCellAltChar s, a)) -> a -> s
-    unfoldrN    :: Int -> (a -> Maybe (StringCellChar    s, a)) -> a -> s
-    altUnfoldrN :: Int -> (a -> Maybe (StringCellAltChar s, a)) -> a -> s
+    unfoldr       ::          (a -> Maybe (StringCellChar    s, a)) -> a -> s
+    altUnfoldr    ::          (a -> Maybe (StringCellAltChar s, a)) -> a -> s
+    unfoldrN      :: Int   -> (a -> Maybe (StringCellChar    s, a)) -> a -> s
+    altUnfoldrN   :: Int   -> (a -> Maybe (StringCellAltChar s, a)) -> a -> s
+    unfoldrN64    :: Int64 -> (a -> Maybe (StringCellChar    s, a)) -> a -> s
+    altUnfoldrN64 :: Int64 -> (a -> Maybe (StringCellAltChar s, a)) -> a -> s
 
     unfoldr f b =
         case f b of
@@ -98,6 +104,10 @@ class (Eq s, Monoid s, IsString s, Typeable s, StringCell (StringCellChar s), St
             (Nothing)         -> empty
     unfoldrN    = const unfoldr
     altUnfoldrN = const altUnfoldr
+
+    unfoldrN64 l f z = unfoldrN (fromIntegral l) f z
+
+    altUnfoldrN64 l f z = altUnfoldrN (fromIntegral l) f z
 
     -- | Get the character at the given position
     --
@@ -333,6 +343,10 @@ class ConvText s where
     toText :: s -> T.Text
     fromText :: T.Text -> s
 
+class ConvLazyText s where
+    toLazyText :: s -> LT.Text
+    fromLazyText :: LT.Text -> s
+
 -- | Minimal complete definition: 'hGetContents', 'hGetLine', 'hPutStr', and 'hPutStrLn'
 class StringRWIO s where
     --- Handles
@@ -531,6 +545,36 @@ instance StringCells T.Text where
     append          = T.append
     concat          = T.concat
 
+instance StringCells LT.Text where
+    type StringCellChar    LT.Text = Char
+    type StringCellAltChar LT.Text = Char
+
+    toStringCells   = fromLazyText
+    fromStringCells = toLazyText
+
+    length64        = LT.length
+    empty           = LT.empty
+    null            = LT.null
+    cons            = LT.cons
+    safeUncons      = LT.uncons
+    uncons          = maybe (error "StringCells.Data.Text.Lazy.Text.uncons: string is null") id . safeUncons
+    snoc            = LT.snoc
+    altSnoc         = LT.snoc
+    toMainChar      = Tagged . toChar
+    toAltChar       = Tagged . toChar
+    head            = LT.head
+    tail            = LT.tail
+    init            = LT.init
+    last            = LT.last
+    unfoldr         = LT.unfoldr
+    altUnfoldr      = LT.unfoldr
+    unfoldrN64      = LT.unfoldrN
+    altUnfoldrN64   = LT.unfoldrN
+    index s         = index64 s . fromIntegral
+    index64         = LT.index
+    append          = LT.append
+    concat          = LT.concat
+
 instance StringCell Char where
     toChar     = id
     toWord8    = BI.c2w
@@ -615,6 +659,11 @@ instance ConvGenString T.Text where
     fromGenString _s = case _s of
         (GenString _s) -> toStringCells _s
 
+instance ConvGenString LT.Text where
+    toGenString      = GenString
+    fromGenString _s = case _s of
+        (GenString _s) -> toStringCells _s
+
 instance ConvString GenString where
     toString   = fromGenString
     fromString = toGenString
@@ -634,6 +683,10 @@ instance ConvString LC.ByteString where
 instance ConvString T.Text where
     toString   = T.unpack
     fromString = T.pack
+
+instance ConvString LT.Text where
+    toString   = LT.unpack
+    fromString = LT.pack
 
 instance ConvStrictByteString GenString where
     toStrictByteString   = fromGenString
@@ -655,6 +708,10 @@ instance ConvStrictByteString T.Text where
     toStrictByteString   = TE.encodeUtf8
     fromStrictByteString = toText
 
+instance ConvStrictByteString LT.Text where
+    toStrictByteString   = toStrictByteString . LTE.encodeUtf8
+    fromStrictByteString = toLazyText
+
 instance ConvLazyByteString GenString where
     toLazyByteString   = fromGenString
     fromLazyByteString = toGenString
@@ -675,6 +732,10 @@ instance ConvLazyByteString T.Text where
     toLazyByteString   = toLazyByteString . toStrictByteString
     fromLazyByteString = toText
 
+instance ConvLazyByteString LT.Text where
+    toLazyByteString   = toLazyByteString . toStrictByteString
+    fromLazyByteString = toLazyText
+
 instance ConvText GenString where
     toText   = fromGenString
     fromText = toGenString
@@ -694,6 +755,34 @@ instance ConvText L.ByteString where
 instance ConvText T.Text where
     toText   = id
     fromText = id
+
+instance ConvText LT.Text where
+    toText   = LT.toStrict
+    fromText = toLazyText
+
+instance ConvLazyText GenString where
+    toLazyText   = fromGenString
+    fromLazyText = toGenString
+
+instance ConvLazyText String where
+    toLazyText   = LT.pack
+    fromLazyText = LT.unpack
+
+instance ConvLazyText S.ByteString where
+    toLazyText   = LTE.decodeUtf8With TEE.lenientDecode . toLazyByteString
+    fromLazyText = toStrictByteString
+
+instance ConvLazyText L.ByteString where
+    toLazyText   = LTE.decodeUtf8With TEE.lenientDecode
+    fromLazyText = toLazyByteString
+
+instance ConvLazyText T.Text where
+    toLazyText   = LT.fromStrict
+    fromLazyText = fromLazyText
+
+instance ConvLazyText LT.Text where
+    toLazyText   = id
+    fromLazyText = id
 
 -- |
 --
@@ -829,6 +918,34 @@ instance StringRWIO T.Text where
     writeFile    = T.writeFile
 
     appendFile   = T.appendFile
+
+-- |
+--
+-- See 'Data.Text.Lazy.IO' for documentation of behaviour.
+instance StringRWIO LT.Text where
+    hGetContents = LT.hGetContents
+
+    hGetLine     = LT.hGetLine
+
+    hPutStr      = LT.hPutStr
+
+    hPutStrLn    = LT.hPutStrLn
+
+    interact     = LT.interact
+
+    getContents  = LT.getContents
+
+    getLine      = LT.getLine
+
+    putStr       = LT.putStr
+
+    putStrLn     = LT.putStrLn
+
+    readFile     = LT.readFile
+
+    writeFile    = LT.writeFile
+
+    appendFile   = LT.appendFile
 
 -- | Polymorphic container of a string
 --
