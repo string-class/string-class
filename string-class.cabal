@@ -6,7 +6,7 @@ license:               BSD3
 license-file:          LICENSE
 copyright:             Copyright (C) 2010 Byron James Johnson
 author:                Byron James Johnson
-maintainer:            KrabbyKrap@gmail.com
+maintainer:            ByronJohnsonFP@gmail.com
 synopsis:              String class library
 description:           String class library
 category:              Data, Text
@@ -21,5 +21,5 @@ library
     other-extensions:  TypeFamilies, FlexibleContexts, TypeSynonymInstances, ExistentialQuantification, DeriveDataTypeable, FlexibleInstances, UndecidableInstances
 
 source-repository head
-    type:              darcs
-    location:          http://patch-tag.com/r/bob/string-class
+    type:              git
+    location:          git@github.com:bairyn/string-class.git
