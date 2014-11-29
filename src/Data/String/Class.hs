@@ -648,7 +648,7 @@ instance ConvStrictByteString S.ByteString where
     fromStrictByteString = id
 
 instance ConvStrictByteString L.ByteString where
-    toStrictByteString   = S.concat . L.toChunks
+    toStrictByteString   = L.toStrict
     fromStrictByteString = toLazyByteString
 
 instance ConvStrictByteString T.Text where
@@ -664,7 +664,7 @@ instance ConvLazyByteString String where
     fromLazyByteString = LC.unpack
 
 instance ConvLazyByteString S.ByteString where
-    toLazyByteString   = L.fromChunks . (:[])
+    toLazyByteString   = L.fromStrict
     fromLazyByteString = toStrictByteString
 
 instance ConvLazyByteString L.ByteString where
