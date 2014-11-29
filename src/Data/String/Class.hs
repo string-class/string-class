@@ -32,7 +32,6 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Encoding.Error as TEE
 import qualified Data.Text.IO as T
 import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.IO as LT
 import qualified Data.Text.Lazy.Encoding as LTE
 import qualified Data.Text.Lazy.IO as LT
 import Data.Typeable
