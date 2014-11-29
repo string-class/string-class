@@ -1,0 +1,5 @@
+tags
+/dist
+/cabal.sandbox.config
+/.cabal-sandbox
+.*.sw?
