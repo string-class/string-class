@@ -1,6 +1,6 @@
 name:                  string-class
 -- Don't forget to bump the tag too.
-version:               0.1.6.1
+version:               0.1.6.2
 cabal-version:         >= 1.10
 build-type:            Simple
 license:               BSD3
@@ -49,4 +49,4 @@ source-repository head
 source-repository this
   type:     git
   location: git@github.com:bairyn/string-class.git
-  tag:      v0.1.6.1
+  tag:      v0.1.6.2
