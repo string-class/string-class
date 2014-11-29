@@ -10,7 +10,7 @@ maintainer:            ByronJohnsonFP@gmail.com
 synopsis:              String class library
 description:           String class library
 category:              Data, Text
-tested-with:           GHC == 7.0.2
+tested-with:           GHC == 7.8.2
 
 library
     default-language:  Haskell2010
