@@ -1,22 +1,23 @@
-name:                  string-class
+name:               string-class
 -- Don't forget to bump the tag and CHANGELOG placeholder too.
-version:               0.1.6.2
-cabal-version:         >= 1.18
-build-type:            Simple
-license:               BSD3
-license-file:          LICENSE
-copyright:             Copyright (C) 2010 Byron James Johnson
-author:                Byron James Johnson
-maintainer:            ByronJohnsonFP@gmail.com
-synopsis:              String class library
-description:           String class library
-category:              Data, Text
-tested-with:           GHC == 7.8.2
+version:            0.1.6.2
+cabal-version:      >= 1.18
+build-type:         Simple
+license:            BSD3
+license-file:       LICENSE
+copyright:          Copyright (C) 2010 Byron James Johnson
+author:             Byron James Johnson
+maintainer:         ByronJohnsonFP@gmail.com
+category:           Data, Text
+tested-with:        GHC == 7.8.2
 extra-source-files:
 -- The extra-doc-files property requires cabal-version >= 1.18.
 extra-doc-files:
   README.md
  ,CHANGELOG.md
+synopsis:           String class library
+description:
+  String class library.
 
 library
   default-language: Haskell2010
