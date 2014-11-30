@@ -1,0 +1,3 @@
+PLACEHOLDER
+-----
+* Added `CHANGELOG.md`.
