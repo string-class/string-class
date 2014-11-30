@@ -9,6 +9,8 @@ copyright:          Copyright (C) 2010 Byron James Johnson
 author:             Byron James Johnson
 maintainer:         ByronJohnsonFP@gmail.com
 category:           Data, Text
+homepage:           https://github.com/bairyn/string-class
+bug-reports:        https://github.com/bairyn/string-class/issues
 tested-with:        GHC == 7.8.2
 extra-source-files:
 -- The extra-doc-files property requires cabal-version >= 1.18.
