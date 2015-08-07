@@ -3,3 +3,4 @@ tags
 /cabal.sandbox.config
 /.cabal-sandbox
 .*.sw?
+/.stack-work
