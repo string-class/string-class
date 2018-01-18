@@ -23,7 +23,8 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Lazy.Char8 as LC
 import Data.Int
 import qualified Data.List as List
-import Data.Monoid
+import Data.Semigroup
+import Data.Monoid hiding ((<>))
 import Data.String (IsString)
 import qualified Data.String
 import Data.Tagged
@@ -969,10 +970,13 @@ instance Eq GenString where
 instance IsString GenString where
     fromString = GenString
 
+instance Semigroup GenString where
+    (<>) a b = case (a, b) of
+        (GenString _a, GenString _b) -> GenString $ append (toGenDefaultString _a) (toGenDefaultString _b)
+
 instance Monoid GenString where
     mempty  = GenString $ (empty :: GenStringDefault)
-    mappend a b = case (a, b) of
-        (GenString _a, GenString _b) -> GenString $ append (toGenDefaultString _a) (toGenDefaultString _b)
+    mappend = (<>)
     mconcat ss = GenString $ concat . map toGenDefaultString $ ss
 
 instance StringCells GenString where
