@@ -1,6 +1,6 @@
 name:               string-class
 -- Don't forget to bump the tag and CHANGELOG placeholder too.
-version:            0.1.6.5
+version:            0.1.7.0
 cabal-version:      >= 1.18
 build-type:         Simple
 license:            BSD3

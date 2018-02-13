@@ -1,6 +1,11 @@
 PLACEHOLDER
 -----
 
+0.1.7.0
+-------
+
+* PR #2. Add GHC 8.4 support
+
 0.1.6.4
 -----
 
