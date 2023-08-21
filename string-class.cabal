@@ -1,17 +1,17 @@
+cabal-version:      1.18
 name:               string-class
 -- Don't forget to bump the tag and CHANGELOG placeholder too.
-version:            0.1.7.0
-cabal-version:      >= 1.18
+version:            0.1.7.1
 build-type:         Simple
 license:            BSD3
 license-file:       LICENSE
-copyright:          Copyright (C) 2010 Byron James Johnson
+copyright:          Copyright (C) 2010 Byron James Johnson, 2021 Kostiantyn Rybnikov, 2023 Sergey Alirzaev
 author:             Byron James Johnson
-maintainer:         ByronJohnsonFP@gmail.com, Kostiantyn Rybnikov <k-bx@k-bx.com>
+maintainer:         Sergey Alirzaev <zl29ah@gmail.com>, ByronJohnsonFP@gmail.com, Kostiantyn Rybnikov <k-bx@k-bx.com>
 category:           Data, Text
 homepage:           https://github.com/string-class/string-class
 bug-reports:        https://github.com/string-class/string-class/issues
-tested-with:        GHC == 7.8.3
+tested-with:        GHC == 9.6.2
 extra-source-files:
 -- The extra-doc-files property requires cabal-version >= 1.18.
 extra-doc-files:
@@ -55,9 +55,9 @@ library
 
 source-repository head
   type:     git
-  location: git@github.com:bairyn/string-class.git
+  location: https://github.com/string-class/string-class
 
 source-repository this
   type:     git
-  location: git@github.com:bairyn/string-class.git
-  tag:      v0.1.6.4
+  location: https://github.com/string-class/string-class
+  tag:      v0.1.7.1
