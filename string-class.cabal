@@ -1,7 +1,7 @@
 cabal-version:      1.18
 name:               string-class
 -- Don't forget to bump the tag and CHANGELOG placeholder too.
-version:            0.1.7.1
+version:            0.1.7.2
 build-type:         Simple
 license:            BSD3
 license-file:       LICENSE
@@ -11,7 +11,7 @@ maintainer:         Sergey Alirzaev <zl29ah@gmail.com>, ByronJohnsonFP@gmail.com
 category:           Data, Text
 homepage:           https://github.com/string-class/string-class
 bug-reports:        https://github.com/string-class/string-class/issues
-tested-with:        GHC == 9.6.2
+tested-with:        GHC == 9.8.2
 extra-source-files:
 -- The extra-doc-files property requires cabal-version >= 1.18.
 extra-doc-files:
@@ -44,8 +44,8 @@ library
     base       >= 4        && < 5
    -- bytestring's toStrict and fromString methods were first introduced in 0.10.0.0.
    --,bytestring >= 0.9.1.8  && < 0.11
-   ,bytestring >= 0.10.0.0 && < 0.12
-   ,text       >= 0.11.0.1 && < 2.1
+   ,bytestring >= 0.10.0.0 && < 0.13
+   ,text       >= 0.11.0.1 && < 2.2
    ,tagged     >= 0.1.1    && < 0.9
   if !impl(ghc >= 8.0)
     build-depends:
@@ -60,4 +60,4 @@ source-repository head
 source-repository this
   type:     git
   location: https://github.com/string-class/string-class
-  tag:      v0.1.7.1
+  tag:      v0.1.7.2
